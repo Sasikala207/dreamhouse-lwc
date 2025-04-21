@@ -1,0 +1,37 @@
+name: test run scratch
+# Definition when the workflow should run
+on:
+  # The workflow will run whenever an event happens on a pull request test
+  pull_request:
+    types: [opened, synchronize]
+jobs:
+  Create_scratch_Org:
+    runs-on: ubuntu-latest
+    steps:
+      # Install Salesforce CLI
+      - name: "Install Salesforce CLI"
+        run: | 
+          npm install @salesforce/cli --location=global
+          nodeInstallPath=$(npm config get prefix)
+          echo "$nodeInstallPath/bin" >> $GITHUB_PATH
+          sf --version
+      # Checkout the code in the pull request
+      - name: "Checkout source code"
+        uses: actions/checkout@v3
+      # Load secret for dev hub
+      - name: "Populate auth file with SFDX_URL secret"
+        shell: bash
+        run: "echo ${{ secrets.DEVHUB_SFDX_URL_1}} > ./SFDX_URL_1_STORE.txt"
+      - name: "Authenticate with dev hub"
+        run: |
+          sf org login sfdx-url -f ./SFDX_URL_1_STORE.txt -a DevHub -d
+          sf org create scratch --definition-file config/project-scratch-def.json --set-default --alias test-scratch-org --target-dev-hub DevHub
+          sf org generate password --target-org test-scratch-org
+          sf org display -u test-scratch-org  --json --verbose  > test_scratch-org-authfile.json
+      - name:  updload scratch org auth file
+        uses: actions/upload-artifact@v4
+        with:
+          name: authfiles
+          path: ./test_scratch-org-authfile*.json
+      - name: "List the Orgs"
+        run: "sf org list"
